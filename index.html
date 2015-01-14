@@ -1,0 +1,308 @@
+<!doctype html>
+<html>
+<head>
+
+
+<script src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDZfzFH4ZNkpE-NH7DfH_9m-vOSNhawCec&libraries=geometry&sensor=false">
+</script>
+
+
+</head>
+
+<body>
+
+
+<audio controls id ="audio2" style = "display:none;" >
+  <source src="circle.mp3" type="audio/mpeg">
+Your browser does not support the audio element.
+</audio>
+
+    <div id="rotate" >
+        <div class="target" id="googleMap" ></div>
+    </div>
+
+
+<script type="text/javascript">
+
+var myAudio=document.getElementById("audio2");
+myAudio.preload="auto";
+
+ var messWith = document.getElementById("rotate").style;     
+
+ var width = screen.width *2 ; 
+ var height = screen.height *2;
+ marginX = (width - screen.width)/2 *-1;
+ marginY = (height - screen.height)/2 *-1; 
+ messWith.webkitTransformOrigin = screen.width /2- marginX+ "px "+ screen.height/2-marginY +"px";  
+ messWith.marginTop = marginY+"px";
+ messWith.marginLeft = marginX + "px";
+ messWith.width=   Number(width) + "px";
+ messWith.height= Number(height)+ "px";  
+ document.getElementById("googleMap").style.width= Number(width)+"px";
+ document.getElementById("googleMap").style.height= Number(height)+ "px";  
+
+
+
+
+
+function loadXMLDoc(dname)
+{
+if (window.XMLHttpRequest)
+  {
+  xhttp=new XMLHttpRequest();
+  }
+else
+  {
+  xhttp=new ActiveXObject("Microsoft.XMLHTTP");
+  }
+xhttp.open("GET",dname,false);
+xhttp.send();
+return xhttp.responseXML;
+}
+
+var xmlDoc= loadXMLDoc("circle.xml");
+var x=xmlDoc.getElementsByTagName("string");
+var arrayOfLat = new Array (); 
+var arrayOfLong = new Array ();
+var lats = arrayOfLat[0];
+var longs = arrayOfLong[1];
+var map;
+
+ 
+for (i=0;i<x.length;i++)
+  {
+   coords = x[i].childNodes[0].nodeValue.split(",");
+   var latX = coords[0];
+   var longy  = coords[1];
+   arrayOfLat.push(latX);
+   arrayOfLong.push(longy);
+}
+// now make an array of the times in millis between each point 
+
+var stamps = xmlDoc.getElementsByTagName("key");
+var arrayOfTimeStamps = new Array (); 
+for(i=1; i< stamps.length; i++){
+	timeStamp1 = stamps[i -1].childNodes[0].nodeValue;
+	timeStamp2 = stamps[i].childNodes[0].nodeValue;
+	diff = (timeStamp2-timeStamp1)*1000; 
+	arrayOfTimeStamps.push(diff); 
+}
+
+// now make an array that stores the angle for each joint.
+
+
+function bearingInitial (lat1, long1, lat2, long2)
+{
+    return (bearingDegrees(lat1, long1, lat2, long2) + 360) % 360;
+}
+
+function bearingFinal(lat1, long1, lat2, long2) {
+    return (bearingDegrees(lat2, long2, lat1, long1) + 180) % 360;
+}
+
+function bearingDegrees (lat1, long1, lat2, long2)
+{
+    var degToRad= Math.PI/180.0;
+
+    var phi1= lat1 * degToRad;
+    var phi2= lat2 * degToRad;
+    var lam1= long1 * degToRad;
+    var lam2= long2 * degToRad;
+
+    return Math.atan2(Math.sin(lam2-lam1) * Math.cos(phi2),
+        Math.cos(phi1)*Math.sin(phi2) - Math.sin(phi1)*Math.cos(phi2)*Math.cos(lam2-lam1)
+    ) * 180/Math.PI;
+}
+
+var angles = new Array(); 
+for (i=0; i < (arrayOfLat.length -1); i++ ){
+	lat1 = arrayOfLat[i];
+	long1  = arrayOfLong[i];
+	lat2 = arrayOfLat[i+1];
+	long2  = arrayOfLong[i+1];
+	rotation = 360 - bearingInitial(lat1, long1, lat2, long2);
+	angles.push(rotation); 
+}
+
+
+// set the first the initial point to the first two in the xml file and initialize map
+function initialize()
+{
+var mapProp = {
+  center:new google.maps.LatLng(lats,longs),
+  zoom:20,
+  mapTypeId:google.maps.MapTypeId.SATELLITE,
+  disableDefaultUI:true,    
+  };
+map =new google.maps.Map(document.getElementById("googleMap"),mapProp);
+}
+
+
+
+function muteIt (){
+	console.log("mute"); 
+	myAudio.muted = !(myAudio.muted); 
+	//debugger; 
+}
+
+google.maps.event.addDomListener(window, 'load', initialize);
+google.maps.event.addDomListener(window, 'keypress', muteIt);
+// now starts the actual animation part
+
+
+
+
+// helper function to move the map
+function pan(fat,tall){
+  	var panPoint = new google.maps.LatLng(fat,tall);
+  	map.setCenter(panPoint);
+  }
+
+// make a helper function to determine the rotation in degrees from North between two pnts
+
+
+
+
+
+function rotation (long1, long2, lat1, lat2){
+	x = (Number(long2-long1)) * Math.cos((Number(lat1)+Number(lat2))/2);
+	//console.log("x" + x); 
+	y = (lat2-lat1);
+	//console.log("y" + y); 
+	angle=Math.atan(Number(y)/Number(x));	
+	messWith.webkitTransform = "rotate("+angle*100+"deg)";
+		
+	//console.log("angle " + angle);
+	var point1 = new google.maps.LatLng(lat1,long2);
+	var pixelLoc = map.getProjection().fromDivPixelToLatLng(point1);
+	//console.log("1x "+ pixelLoc.x + " 1y " + pixelLoc.y); 
+	var point2 = new google.maps.LatLng(lat2,long2);
+	var pixelLoc2 = map.getProjection().fromDivPixelToLatLng(point2);
+	//console.log("2x "+ pixelLoc2.x + " 2y " + pixelLoc2.y); 
+	//var heading = google.maps.geometry.spherical.computeHeading(point1, point2);
+	//console.log("angleGoogle " + heading);
+	//return angle*100;
+}
+
+
+/*
+function rotation (long1, long2, lat1, lat2){
+	var point1 = new google.maps.LatLng(lat1,long2);
+	var point2 = new google.maps.LatLng(lat2,long2);
+	var heading = google.maps.geometry.spherical.computeHeading(point1, point2);
+	return heading;
+}
+*/
+  
+  var curX ; 
+  var curY ;
+  var nextX; 
+  var nextY; 
+  var millisToWait;
+  var d;
+  var millisAncor; 
+  var index;
+  var clrInt;
+  // if the audio can play 
+//myAudio.onloadeddata = 
+function something (){
+myAudio.play(); 
+//console.log(myAudio);
+curX = arrayOfLat[0]; 
+curY = arrayOfLong[0];
+ nextX = arrayOfLat[1]; 
+nextY = arrayOfLong[1]; 
+ millisToWait = arrayOfTimeStamps[0];
+ d = new Date();
+  millisAncor = d.getTime(); 
+index = 2;
+  	
+  clrInt =self.setInterval(function(){moveForward()},15); 
+}
+
+
+rot1 = bearingInitial(41.990824,-73.201841,41.990821,-73.201866); 
+//console.log("bearingInitial " + rot1); 
+rot2 = bearingFinal(41.990824,-73.201841,41.990821,-73.201866); 
+//console.log("bearingFinal " + rot2); 
+
+something(); 
+var count = 0; 
+var count2 = 0; 
+var count3 = 0; 
+var lamdaAid = true; 
+var rotGoal = angles[index]; 
+var rotPercent =0 ;
+var lastRot = 0;
+var diffRot = angles[index];
+console.log("it should be around this long: " + arrayOfLat.length); 
+  
+  function moveForward() 
+  {
+  	f= new Date();
+    millisComp = f.getTime();
+    percentage = (millisComp -millisAncor) / millisToWait ; 
+  	//console.log(myAudio.readyState); 
+  	//console.log(myAudio);
+  	if ( index <= arrayOfLat.length-1){	
+  		if (percentage >= 1){ 
+  			l = new Date(); 
+  			millisAncor = l.getTime(); 
+  			millisToWait = arrayOfTimeStamps[index];
+  			curX = arrayOfLat[index];
+      		curY = arrayOfLong[index];
+      		nextX = arrayOfLat[index+1];
+      		nextY = arrayOfLong[index+1];
+  			index += 1;
+  			//console.log("initial"+ rot1); 
+  			//messWith.webkitTransform = "rotate("+angles[index]+"deg)";
+  			//rot2 = bearingFinal(curX,curY,nextX,nextY); 
+  			//console.log("Final"+ rot2); 
+  			// reset rotation 
+  			pan(curX, curY); 
+
+  		}
+  		else {
+  			
+  			console.log("percentage: " + percentage ); 
+  			if (percentage > .5){
+  				console.log ("greater" + percentage);  
+  				rotPercent = percentage - .5;
+  			}
+  			else{
+  				console.log ("less" + percentage);  
+  				rotPercent = percentage +.5; 
+  			}  
+  			
+  			if (Math.abs(percentage-.5) < .1 && lamdaAid == true ){
+  				rotGoal = angles [index+1]; 
+  				lastRot = drawRot;
+  				diffRot = rotGoal - lastRot; 
+  				lamdaAid = false; 
+  				count2 += 1;
+  				console.log( percentage);
+  				console.log ("bam " + index);  
+  				//rotAngles[index];
+  			}
+  			else if ( lamdaAid == false && percentage > .6){
+  				lamdaAid = true; 
+  			}
+  			
+  			drawRot = rotPercent * diffRot + lastRot;
+  			console.log("rotPercent: " + rotPercent);
+  			console.log("rotGoal: " + rotGoal);
+  			console.log("drawrot: " + drawRot);
+  			messWith.webkitTransform = "rotate(" + drawRot+"deg)";
+  			drawx = (Number(nextX) - Number(curX))*percentage + Number(curX);
+  			drawy = (Number(nextY) - Number(curY))*percentage + Number(curY);
+  			pan(drawx,drawy); 
+		}
+		}
+  	else{
+  			//something(); 
+  			clearInterval(clrInt);	
+  	}
+  	}
+</script>
+</body>
+</html>
